@@ -28,7 +28,7 @@ var emitEvent = function (self, event) {
   };
 };
 
-var sendData = function (res, format, modelName, status, meta) {
+var sendData = function (res, format, callbackOnly, modelName, status, meta) {
   return function (model, cb) {
     if (format === 'json-api') {
       var responseObj = {};
@@ -40,9 +40,15 @@ var sendData = function (res, format, modelName, status, meta) {
         responseObj['meta'] = res.meta;
         responseObj['data'] = model;
         delete res.meta;
-        return res.json(status, responseObj);
+        if(!callbackOnly) {
+          res.json(status, responseObj);
+        }
+        return cb(undefined, responseObj);
       } 
-      return res.json(status, model);
+      if(!callbackOnly) {
+        res.json(status, model);
+      }
+      return cb(undefined, model);
     } else {
       res.send(status, model);
     }
@@ -278,6 +284,7 @@ Resource.prototype.query = function (options) {
   options.populate = options.populate || this.options.populate;
   options.select = options.select || this.options.select;
   options.order = options.order || this.options.order;
+  options.callbackOnly = options.callbackOnly || false;
 
   return function (req, res, next) {
     var query = self.Model.find({});
@@ -325,7 +332,7 @@ Resource.prototype.query = function (options) {
       applyTotalCount(res, options.outputFormat),
       buildProjections(req, options.projection),
       emitEvent(self, 'query'),
-      sendData(res, options.outputFormat, options.modelName)
+      sendData(res, options.outputFormat, options.callbackOnly, options.modelName)
     ], next);
 
   };
@@ -340,6 +347,7 @@ Resource.prototype.detail = function (options) {
   options.modelName = options.modelName || this.options.modelName;
   options.populate = options.populate || this.options.populate;
   options.select = options.select || this.options.select;
+  options.callbackOnly = options.callbackOnly || false;
 
   return function (req, res, next) {
     var find = {};
@@ -358,7 +366,7 @@ Resource.prototype.detail = function (options) {
       execQuery(query),
       buildProjection(req, options.projection),
       emitEvent(self, 'detail'),
-      sendData(res, options.outputFormat, options.modelName)
+      sendData(res, options.outputFormat, options.callbackOnly, options.modelName)
     ], next);
   };
 };
@@ -372,6 +380,7 @@ Resource.prototype.insert = function (options) {
   options.outputFormat = options.outputFormat || this.options.outputFormat;
   options.modelName = options.modelName || this.options.modelName;
   options.projection = options.projection || this.options.detailProjection;
+  options.callbackOnly = options.callbackOnly || false;
 
   return function (req, res, next) {
     var model = new self.Model(req.body);
@@ -381,7 +390,7 @@ Resource.prototype.insert = function (options) {
       setLocationHeader(req, res, true, options.baseUrl),
       buildProjection(req, options.projection),
       emitEvent(self, 'insert'),
-      sendData(res, options.outputFormat, options.modelName, 201)
+      sendData(res, options.outputFormat, options.callbackOnly, options.modelName, 201)
     ], next);
   };
 };
@@ -395,6 +404,7 @@ Resource.prototype.update = function (options) {
   options.outputFormat = options.outputFormat || this.options.outputFormat;
   options.modelName = options.modelName || this.options.modelName;
   options.projection = options.projection || this.options.detailProjection;
+  options.callbackOnly = options.callbackOnly || false;
 
   return function (req, res, next) {
     var find = {};
@@ -427,7 +437,7 @@ Resource.prototype.update = function (options) {
         setLocationHeader(req, res, false, options.baseUrl),
         buildProjection(req, options.projection),
         emitEvent(self, 'update'),
-        sendData(res, options.outputFormat, options.modelName)
+        sendData(res, options.outputFormat, options.callbackOnly, options.modelName)
       ], next);
     });
   };
